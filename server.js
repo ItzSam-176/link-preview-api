@@ -47,38 +47,34 @@ async function initCluster() {
 
   cluster.task(async ({ page, data: url, worker }) => {
     console.log(`Puppeteer Worker ${worker.id} started: ${url}`);
+
     await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 Edg/118.0.2088.0"
     );
+
     await page.setViewport({ width: 1280, height: 800 });
     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
 
-    try {
-      await page.goto(url, {
-        waitUntil: "networkidle2",
-        timeout: GOTO_TIMEOUT,
-      });
-      await page.waitForTimeout(1500); // allow JS to inject metadata
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    await page.waitForTimeout(2000); // allow JS to finish
 
-      const metadata = await page.evaluate(() => {
-        const get = (name) =>
-          document.querySelector(`meta[property='${name}']`)?.content ||
-          document.querySelector(`meta[name='${name}']`)?.content ||
-          null;
+    const metadata = await page.evaluate(() => {
+      const get = (name) =>
+        document.querySelector(`meta[property='${name}']`)?.content ||
+        document.querySelector(`meta[name='${name}']`)?.content ||
+        null;
 
-        return {
-          title: get("og:title") || document.title || null,
-          description: get("og:description") || get("description") || null,
-          image: get("og:image") || get("twitter:image") || null,
-          url: get("og:url") || window.location.href,
-          video: get("og:video") || get("twitter:player") || null,
-        };
-      });
+      return {
+        title: get("og:title") || document.title || null,
+        description: get("og:description") || get("description") || null,
+        image: get("og:image") || get("twitter:image") || null,
+        url: get("og:url") || window.location.href,
+        video: get("og:video") || get("twitter:player") || null,
+      };
+    });
 
-      return metadata;
-    } finally {
-      console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
-    }
+    console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
+    return metadata;
   });
 }
 
