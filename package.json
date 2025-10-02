@@ -1,0 +1,33 @@
+{
+  "name": "link-preview-api",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "express": "^5.1.0",
+    "got": "^11.8.6",
+    "metascraper": "^5.49.4",
+    "metascraper-author": "^5.49.2",
+    "metascraper-date": "^5.49.2",
+    "metascraper-description": "^5.49.2",
+    "metascraper-image": "^5.49.2",
+    "metascraper-lang": "^5.49.2",
+    "metascraper-logo": "^5.49.2",
+    "metascraper-publisher": "^5.49.2",
+    "metascraper-title": "^5.49.2",
+    "metascraper-url": "^5.49.2",
+    "metascraper-video": "^5.49.2",
+    "puppeteer": "^24.23.0",
+    "puppeteer-cluster": "^0.24.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
