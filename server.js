@@ -25,6 +25,27 @@ const GOT_REQUEST_TIMEOUT = 20000;
 const PUPPETEER_RETRIES = 2;
 
 let cluster;
+(async () => {
+  try {
+    console.log("🔹 Testing Puppeteer on this environment...");
+    const browser = await puppeteerExtra.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // uses /usr/bin/chromium
+    });
+    const page = await browser.newPage();
+    await page.goto("https://example.com", { waitUntil: "domcontentloaded" });
+    const title = await page.title();
+    console.log("🔹 Puppeteer launched successfully! Page title:", title);
+    await browser.close();
+  } catch (err) {
+    console.error("❌ Puppeteer failed to launch:", err);
+  }
+})();
 
 /* --- Initialize Puppeteer Cluster --- */
 async function initCluster() {
