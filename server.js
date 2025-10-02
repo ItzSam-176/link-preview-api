@@ -196,6 +196,7 @@ app.post("/preview", async (req, res) => {
       if (!metadata.title || !metadata.description || !metadata.image) {
         console.log("⚠️ Falling back to Puppeteer Cluster...", url);
         const puppeteerMeta = await scrapeWithPuppeteer(url);
+        console.log('Puppeteer result:', puppeteerMeta);
         if (puppeteerMeta) metadata = puppeteerMeta;
       }
     }
