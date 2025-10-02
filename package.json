@@ -11,6 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@sparticuz/chromium": "^140.0.0",
     "cheerio": "^1.1.2",
     "express": "^5.1.0",
     "got": "^11.8.6",
@@ -25,9 +26,12 @@
     "metascraper-title": "^5.49.2",
     "metascraper-url": "^5.49.2",
     "metascraper-video": "^5.49.2",
-    "puppeteer": "^24.23.0",
     "puppeteer-cluster": "^0.24.0",
+    "puppeteer-core": "^24.23.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.23.0"
   }
 }

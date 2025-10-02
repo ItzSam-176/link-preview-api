@@ -12,6 +12,11 @@ const metascraper = require("metascraper")([
 const { Cluster } = require("puppeteer-cluster");
 const puppeteerExtra = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const puppeteer =
+  process.env.NODE_ENV === "production"
+    ? require("puppeteer-core")
+    : require("puppeteer");
+const chromium = require("@sparticuz/chromium");
 
 puppeteerExtra.use(StealthPlugin());
 
@@ -29,14 +34,12 @@ console.log("Chromium path:", process.env.PUPPETEER_EXECUTABLE_PATH);
 (async () => {
   try {
     console.log("🔹 Testing Puppeteer on this environment...");
-    const browser = await puppeteerExtra.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // uses /usr/bin/chromium
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
     const page = await browser.newPage();
     await page.goto("https://example.com", { waitUntil: "domcontentloaded" });
@@ -56,6 +59,7 @@ async function initCluster() {
     puppeteer: puppeteerExtra,
     puppeteerOptions: {
       headless: "new",
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
