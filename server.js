@@ -55,14 +55,27 @@ async function initCluster() {
 
     try {
       await page.goto(url, {
-        waitUntil: "domcontentloaded",
+        waitUntil: "networkidle2",
         timeout: GOTO_TIMEOUT,
       });
-      await page
-        .waitForSelector('meta[property="og:title"]', { timeout: 10000 })
-        .catch(() => {});
-      const content = await page.content();
-      return content;
+      await page.waitForTimeout(1500); // allow JS to inject metadata
+
+      const metadata = await page.evaluate(() => {
+        const get = (name) =>
+          document.querySelector(`meta[property='${name}']`)?.content ||
+          document.querySelector(`meta[name='${name}']`)?.content ||
+          null;
+
+        return {
+          title: get("og:title") || document.title || null,
+          description: get("og:description") || get("description") || null,
+          image: get("og:image") || get("twitter:image") || null,
+          url: get("og:url") || window.location.href,
+          video: get("og:video") || get("twitter:player") || null,
+        };
+      });
+
+      return metadata;
     } finally {
       console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
     }
@@ -196,7 +209,7 @@ app.post("/preview", async (req, res) => {
       if (!metadata.title || !metadata.description || !metadata.image) {
         console.log("⚠️ Falling back to Puppeteer Cluster...", url);
         const puppeteerMeta = await scrapeWithPuppeteer(url);
-        console.log('Puppeteer result:', puppeteerMeta);
+        console.log("Puppeteer result:", puppeteerMeta);
         if (puppeteerMeta) metadata = puppeteerMeta;
       }
     }
