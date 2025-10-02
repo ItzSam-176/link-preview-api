@@ -22,7 +22,7 @@ app.use(express.json());
 const MAX_CONCURRENCY = 1;
 const GOTO_TIMEOUT = 60000; // 60s for slow JS pages
 const GOT_REQUEST_TIMEOUT = 20000;
-const PUPPETEER_RETRIES = 2;
+const PUPPETEER_RETRIES = 0;
 
 let cluster;
 
