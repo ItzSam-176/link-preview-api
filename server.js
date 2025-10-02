@@ -12,84 +12,38 @@ const metascraper = require("metascraper")([
 const { Cluster } = require("puppeteer-cluster");
 const puppeteerExtra = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const chromium = require("@sparticuz/chromium"); // serverless-friendly Chromium
+const puppeteerCore = require("puppeteer-core");
 
 puppeteerExtra.use(StealthPlugin());
-
-const isProd = process.env.NODE_ENV === "production";
-
-// Use puppeteer-core in production, full puppeteer locally
-const puppeteer = isProd ? require("puppeteer-core") : require("puppeteer");
-const chromium = isProd ? require("@sparticuz/chromium") : null;
 
 const app = express();
 app.use(express.json());
 
 /* --- Config --- */
-const MAX_CONCURRENCY = 1;
+const MAX_CONCURRENCY = 1; // safe for Render
 const GOTO_TIMEOUT = 60000; // 60s for slow JS pages
 const PUPPETEER_RETRIES = 2;
 
 let cluster;
 
-/* --- Determine executable path --- */
-const getExecutablePath = async () => {
-  if (isProd) {
-    return await chromium.executablePath();
-  } else {
-    // macOS local dev
-    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  }
-};
-
-/* --- Test Puppeteer startup --- */
-(async () => {
-  try {
-    const executablePath = await getExecutablePath();
-    console.log("🔹 Testing Puppeteer...");
-    const browser = await puppeteer.launch({
-      headless: isProd ? chromium.headless : true,
-      args: isProd ? chromium.args : [],
-      executablePath,
-      ignoreHTTPSErrors: true,
-    });
-    const page = await browser.newPage();
-    await page.goto("https://example.com", { waitUntil: "domcontentloaded" });
-    console.log(
-      "🔹 Puppeteer launched successfully! Page title:",
-      await page.title()
-    );
-    await browser.close();
-  } catch (err) {
-    console.error("❌ Puppeteer failed to launch:", err);
-  }
-})();
-
 /* --- Initialize Puppeteer Cluster --- */
 async function initCluster() {
-  const executablePath = await getExecutablePath();
-
   cluster = await Cluster.launch({
     concurrency: Cluster.CONCURRENCY_CONTEXT,
     maxConcurrency: MAX_CONCURRENCY,
     puppeteer: puppeteerExtra,
     puppeteerOptions: {
-      headless: isProd ? chromium.headless : true,
-      executablePath,
-      args: isProd
-        ? chromium.args.concat([
-            "--disable-dev-shm-usage",
-            "--disable-setuid-sandbox",
-            "--no-sandbox",
-            "--disable-blink-features=AutomationControlled",
-          ])
-        : [],
+      headless: true,
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
     },
     timeout: GOTO_TIMEOUT + 10000,
   });
 
   cluster.task(async ({ page, data: url, worker }) => {
     console.log(`Puppeteer Worker ${worker.id} started: ${url}`);
-
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     );
@@ -137,7 +91,7 @@ async function expandUrl(shortUrl) {
   }
 }
 
-/* --- Cheerio scraping --- */
+/* --- Cheerio scraper (fast) --- */
 async function scrapeWithCheerio(url) {
   const { body } = await got(url, {
     headers: { "user-agent": "Mozilla/5.0" },
@@ -167,7 +121,7 @@ async function scrapeWithMetascraper(url) {
   return metascraper({ html: body, url });
 }
 
-/* --- Puppeteer scraping with retries --- */
+/* --- Puppeteer scraper with retries --- */
 async function scrapeWithPuppeteer(url, retries = PUPPETEER_RETRIES) {
   if (!cluster) throw new Error("Puppeteer cluster not initialized");
   try {
@@ -197,7 +151,7 @@ async function scrapeWithPuppeteer(url, retries = PUPPETEER_RETRIES) {
   }
 }
 
-/* --- JS-heavy site detection --- */
+/* --- Detect JS-heavy sites --- */
 function isJsHeavySite(url) {
   const jsHeavyHosts = ["barnesandnoble"];
   try {
@@ -208,7 +162,7 @@ function isJsHeavySite(url) {
   }
 }
 
-/* --- Hybrid API Route --- */
+/* --- API Route --- */
 app.post("/preview", async (req, res) => {
   let { url } = req.body;
   if (!url) return res.status(400).json({ error: "Missing 'url'" });
@@ -218,12 +172,16 @@ app.post("/preview", async (req, res) => {
     let metadata = null;
 
     if (isJsHeavySite(url)) {
+      console.log("Using Puppeteer for JS-heavy page:", url);
       metadata = await scrapeWithPuppeteer(url);
     } else {
       metadata = await scrapeWithCheerio(url);
-      if (!metadata.title || !metadata.description || !metadata.image)
-        metadata = await scrapeWithMetascraper(url);
       if (!metadata.title || !metadata.description || !metadata.image) {
+        console.log("Falling back to Metascraper...", url);
+        metadata = await scrapeWithMetascraper(url);
+      }
+      if (!metadata.title || !metadata.description || !metadata.image) {
+        console.log("Falling back to Puppeteer Cluster...", url);
         const puppeteerMeta = await scrapeWithPuppeteer(url);
         if (puppeteerMeta) metadata = puppeteerMeta;
       }
@@ -238,10 +196,10 @@ app.post("/preview", async (req, res) => {
         video: null,
       };
 
-    return res.json(metadata);
+    res.json(metadata);
   } catch (err) {
-    console.error("❌ Error fetching metadata:", err.stack || err);
-    return res.json({
+    console.error("Error fetching metadata:", err.stack || err);
+    res.json({
       title: "Couldn't fetch data",
       description: "An error occurred while fetching metadata.",
       image: null,
