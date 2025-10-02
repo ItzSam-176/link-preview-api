@@ -25,6 +25,7 @@ const GOT_REQUEST_TIMEOUT = 20000;
 const PUPPETEER_RETRIES = 2;
 
 let cluster;
+console.log("Chromium path:", process.env.PUPPETEER_EXECUTABLE_PATH);
 (async () => {
   try {
     console.log("🔹 Testing Puppeteer on this environment...");
