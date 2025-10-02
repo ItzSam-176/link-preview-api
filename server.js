@@ -22,7 +22,7 @@ app.use(express.json());
 const MAX_CONCURRENCY = 1;
 const GOTO_TIMEOUT = 60000; // 60s for slow JS pages
 const GOT_REQUEST_TIMEOUT = 20000;
-const PUPPETEER_RETRIES = 0;
+const PUPPETEER_RETRIES = 2;
 
 let cluster;
 
@@ -44,37 +44,27 @@ async function initCluster() {
     },
     timeout: GOTO_TIMEOUT + 10000,
   });
-
   cluster.task(async ({ page, data: url, worker }) => {
     console.log(`Puppeteer Worker ${worker.id} started: ${url}`);
-
     await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 Edg/118.0.2088.0"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     );
-
     await page.setViewport({ width: 1280, height: 800 });
     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
 
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-    await page.waitForTimeout(2000); // allow JS to finish
-
-    const metadata = await page.evaluate(() => {
-      const get = (name) =>
-        document.querySelector(`meta[property='${name}']`)?.content ||
-        document.querySelector(`meta[name='${name}']`)?.content ||
-        null;
-
-      return {
-        title: get("og:title") || document.title || null,
-        description: get("og:description") || get("description") || null,
-        image: get("og:image") || get("twitter:image") || null,
-        url: get("og:url") || window.location.href,
-        video: get("og:video") || get("twitter:player") || null,
-      };
-    });
-
-    console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
-    return metadata;
+    try {
+      await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: GOTO_TIMEOUT,
+      });
+      await page
+        .waitForSelector('meta[property="og:title"]', { timeout: 10000 })
+        .catch(() => {});
+      const content = await page.content();
+      return content;
+    } finally {
+      console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
+    }
   });
 }
 
