@@ -387,10 +387,10 @@ const GOTO_TIMEOUT = 60000; // 60s for slow JS pages
 const GOT_REQUEST_TIMEOUT = 20000;
 
 let browser;
-
+const isProduction = process.env.NODE_ENV === "production";
 /* --- Initialize Puppeteer Browser --- */
 async function initBrowser() {
-  const isProduction = process.env.NODE_ENV === "production";
+  
   const executablePath = isProduction
     ? await chromium.executablePath()
     : require("puppeteer").executablePath();
@@ -472,16 +472,17 @@ async function scrapeWithPuppeteer(url) {
   const page = await browser.newPage();
   try {
     await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36"
     );
     await page.setViewport({ width: 1280, height: 800 });
     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT });
-    await page.waitForSelector('meta[property="og:title"]', { timeout: 10000 }).catch(() => {});
+    await page.goto(url, { waitUntil: "networkidle0", timeout: GOTO_TIMEOUT });
+    await page.waitForTimeout(2000); // give JS time to populate OG tags
 
     const html = await page.content();
     const $ = cheerio.load(html);
+
     const getMeta = (name) =>
       $(`meta[property='${name}']`).attr("content") ||
       $(`meta[name='${name}']`).attr("content") ||
@@ -498,6 +499,7 @@ async function scrapeWithPuppeteer(url) {
     await page.close();
   }
 }
+
 
 /* --- Detect JS-heavy sites --- */
 function isJsHeavySite(url) {
