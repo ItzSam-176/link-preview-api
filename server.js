@@ -470,17 +470,36 @@ async function scrapeWithPuppeteer(url) {
 
   const page = await browser.newPage();
   try {
+    // --- Stealth + User-Agent + Headers ---
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36"
     );
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
+
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     });
 
-    await page.goto(url, { waitUntil: "networkidle0", timeout: GOTO_TIMEOUT });
-    await page.waitForTimeout(2000); // give JS time to populate OG tags
+    // --- Skip heavy resources ---
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const resourceType = req.resourceType();
+      if (["image", "media", "font"].includes(resourceType)) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    // --- Reduce navigation wait: use domcontentloaded instead of networkidle0 ---
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: GOTO_TIMEOUT,
+    });
+
+    // --- Give JS some time for dynamic OG/meta tags ---
+    await page.waitForTimeout(2000);
 
     const html = await page.content();
     const $ = cheerio.load(html);
