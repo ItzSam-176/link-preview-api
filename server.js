@@ -499,7 +499,8 @@ async function scrapeWithPuppeteer(url) {
     });
 
     // --- Give JS some time for dynamic OG/meta tags ---
-    await page.waitForTimeout(2000);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
 
     const html = await page.content();
     const $ = cheerio.load(html);
