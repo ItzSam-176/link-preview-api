@@ -400,6 +400,8 @@ async function initBrowser() {
       "--disable-dev-shm-usage",
     ],
     executablePath,
+    userDataDir: isProduction ? "/tmp/puppeteer_profile" : undefined,
+    dumpio: true, // debug Chromium errors on Render
   });
 
   console.log("✅ Puppeteer browser launched!");

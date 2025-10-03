@@ -1,10 +1,20 @@
-# Use lightweight Node base
+# Base Node image
 FROM node:22-slim
 
-# Install required system libraries for Chromium
+# Set working directory
+WORKDIR /usr/src/app
+
+# Install system dependencies for Chromium + fonts + utilities
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    wget \
+    gnupg \
     fonts-liberation \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-freefont-ttf \
     libasound2 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
@@ -27,20 +37,30 @@ RUN apt-get update && apt-get install -y \
     libxshmfence1 \
     libxss1 \
     libxtst6 \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+    dumb-init \
+    --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
-# Set workdir
-WORKDIR /usr/src/app
+# Add non-root user for Puppeteer
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+    && mkdir -p /home/pptruser/Downloads \
+    && chown -R pptruser:pptruser /home/pptruser
 
-# Copy package.json and lock file first (better caching)
+USER pptruser
+
+# Copy package files
 COPY package*.json ./
 
 # Install dependencies
 RUN npm ci --omit=dev
 
-# Copy rest of the source code
-COPY . .
+# Copy source code
+COPY --chown=pptruser:pptruser . .
 
-# Default command
+# Expose port
+EXPOSE 3000
+
+# Entrypoint with dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start server
 CMD ["node", "server.js"]
