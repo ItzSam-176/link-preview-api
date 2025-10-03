@@ -30,50 +30,135 @@ const PUPPETEER_RETRIES = 2;
 let cluster;
 
 /* --- Initialize Puppeteer Cluster --- */
+// async function initCluster() {
+//   cluster = await Cluster.launch({
+//     concurrency: Cluster.CONCURRENCY_CONTEXT,
+//     maxConcurrency: MAX_CONCURRENCY,
+//     puppeteer: puppeteerExtra,
+
+//     puppeteerOptions: {
+//       headless: "new",
+//       args: [
+//         ...chromium.args,
+//         "--disable-blink-features=AutomationControlled", // stealth tweak
+//       ],
+
+//       executablePath:
+//         process.env.NODE_ENV === "production"
+//           ? await chromium.executablePath()
+//           : puppeteerExtra.executablePath(),
+//     },
+//     timeout: GOTO_TIMEOUT + 10000,
+//   });
+
+//   cluster.task(async ({ page, data: url, worker }) => {
+//     console.log(`Puppeteer Worker ${worker.id} started: ${url}`);
+//     await page.setUserAgent(
+//       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+//     );
+//     await page.setViewport({ width: 1280, height: 800 });
+//     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
+
+//     try {
+//       await page.goto(url, {
+//         waitUntil: "domcontentloaded",
+//         timeout: GOTO_TIMEOUT,
+//       });
+//       await page
+//         .waitForSelector('meta[property="og:title"]', { timeout: 10000 })
+//         .catch(() => {});
+//       const content = await page.content();
+//       return content;
+//     } finally {
+//       console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
+//     }
+//   });
+// }
+
 async function initCluster() {
-  cluster = await Cluster.launch({
-    concurrency: Cluster.CONCURRENCY_CONTEXT,
-    maxConcurrency: MAX_CONCURRENCY,
-    puppeteer: puppeteerExtra,
+  console.log("🔹 Starting Puppeteer cluster initialization...");
 
-    puppeteerOptions: {
-      headless: "new",
-      args: [
-        ...chromium.args,
-        "--disable-blink-features=AutomationControlled", // stealth tweak
-      ],
+  const isProduction = process.env.NODE_ENV === "production";
+  console.log("🔹 Environment:", process.env.NODE_ENV);
 
-      executablePath:
-        process.env.NODE_ENV === "production"
-          ? await chromium.executablePath()
-          : puppeteerExtra.executablePath(),
-    },
-    timeout: GOTO_TIMEOUT + 10000,
-  });
+  // Determine executable path
+  let executablePath;
+  try {
+    executablePath = isProduction
+      ? await chromium.executablePath()
+      : require("puppeteer").executablePath();
 
+    console.log("🔹 Executable path resolved:", executablePath);
+    if (!executablePath) {
+      console.warn("⚠️ Executable path is null or undefined!");
+    }
+  } catch (err) {
+    console.error("❌ Failed to get executable path:", err);
+    throw err;
+  }
+
+  // Launch cluster
+  try {
+    console.log("🔹 Launching Puppeteer Cluster...");
+    cluster = await Cluster.launch({
+      concurrency: Cluster.CONCURRENCY_CONTEXT,
+      maxConcurrency: MAX_CONCURRENCY,
+      puppeteer: puppeteerExtra,
+      puppeteerOptions: {
+        headless: chromium.headless,
+        args: [
+          ...chromium.args,
+          "--disable-blink-features=AutomationControlled",
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+        ],
+        executablePath,
+        timeout: GOTO_TIMEOUT,
+      },
+    });
+    console.log("✅ Puppeteer Cluster launched successfully!");
+  } catch (err) {
+    console.error("❌ Failed to launch Puppeteer Cluster:", err);
+    throw err;
+  }
+
+  // Define cluster task
   cluster.task(async ({ page, data: url, worker }) => {
-    console.log(`Puppeteer Worker ${worker.id} started: ${url}`);
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-    );
-    await page.setViewport({ width: 1280, height: 800 });
-    await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
+    console.log(`🔹 Worker ${worker.id} started for URL:`, url);
 
     try {
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+      );
+      await page.setViewport({ width: 1280, height: 800 });
+      await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
+
+      console.log(`🔹 Worker ${worker.id}: Navigating to URL...`);
       await page.goto(url, {
         waitUntil: "domcontentloaded",
         timeout: GOTO_TIMEOUT,
       });
+
+      console.log(`🔹 Worker ${worker.id}: Waiting for meta tag...`);
       await page
         .waitForSelector('meta[property="og:title"]', { timeout: 10000 })
         .catch(() => {});
+
       const content = await page.content();
+      console.log(`✅ Worker ${worker.id}: Finished scraping URL`);
       return content;
+    } catch (err) {
+      console.error(`❌ Worker ${worker.id}: Error scraping URL`, err);
+      throw err;
     } finally {
-      console.log(`Puppeteer Worker ${worker.id} finished: ${url}`);
+      console.log(`🔹 Worker ${worker.id} finished processing URL:`, url);
     }
   });
+
+  console.log("🔹 Puppeteer cluster initialization complete!");
 }
+
+
 
 /* --- Utilities --- */
 function sanitizeUrl(url) {
