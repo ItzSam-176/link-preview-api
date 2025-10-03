@@ -15,7 +15,6 @@
 // require("dotenv").config();
 // const chromium = require("@sparticuz/chromium");
 
-
 // puppeteerExtra.use(StealthPlugin());
 
 // const app = express();
@@ -188,8 +187,6 @@
 //   console.log("🔹 Puppeteer cluster initialization complete!");
 // }
 
-
-
 // /* --- Utilities --- */
 // function sanitizeUrl(url) {
 //   try {
@@ -360,7 +357,6 @@
 //   process.exit();
 // });
 
-
 // server.js
 const express = require("express");
 const got = require("got");
@@ -383,14 +379,13 @@ const app = express();
 app.use(express.json());
 
 /* --- Config --- */
-const GOTO_TIMEOUT = 60000; // 60s for slow JS pages
+const GOTO_TIMEOUT = 90000; // 60s for slow JS pages
 const GOT_REQUEST_TIMEOUT = 20000;
 
 let browser;
 const isProduction = process.env.NODE_ENV === "production";
 /* --- Initialize Puppeteer Browser --- */
 async function initBrowser() {
-  
   const executablePath = isProduction
     ? await chromium.executablePath()
     : require("puppeteer").executablePath();
@@ -474,8 +469,11 @@ async function scrapeWithPuppeteer(url) {
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36"
     );
-    await page.setViewport({ width: 1280, height: 800 });
+    await page.setViewport({ width: 1920, height: 1080 });
     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    });
 
     await page.goto(url, { waitUntil: "networkidle0", timeout: GOTO_TIMEOUT });
     await page.waitForTimeout(2000); // give JS time to populate OG tags
@@ -499,7 +497,6 @@ async function scrapeWithPuppeteer(url) {
     await page.close();
   }
 }
-
 
 /* --- Detect JS-heavy sites --- */
 function isJsHeavySite(url) {
