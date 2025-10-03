@@ -1,23 +1,46 @@
-FROM ghcr.io/puppeteer/puppeteer:24.23.0
+# Use lightweight Node base
+FROM node:22-slim
 
-# Don't download Chromium again
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
-
-# Install Google Chrome
-RUN apt-get update && apt-get install -y wget gnupg \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
+# Install required system libraries for Chromium
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libxrender1 \
+    libxshmfence1 \
+    libxss1 \
+    libxtst6 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
+# Set workdir
 WORKDIR /usr/src/app
 
+# Copy package.json and lock file first (better caching)
 COPY package*.json ./
-RUN npm ci
 
+# Install dependencies
+RUN npm ci --omit=dev
+
+# Copy rest of the source code
 COPY . .
 
+# Default command
 CMD ["node", "server.js"]

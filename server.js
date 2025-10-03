@@ -13,6 +13,8 @@ const { Cluster } = require("puppeteer-cluster");
 const puppeteerExtra = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 require("dotenv").config();
+const chromium = require("@sparticuz/chromium");
+
 
 puppeteerExtra.use(StealthPlugin());
 
@@ -33,16 +35,18 @@ async function initCluster() {
     concurrency: Cluster.CONCURRENCY_CONTEXT,
     maxConcurrency: MAX_CONCURRENCY,
     puppeteer: puppeteerExtra,
+
     puppeteerOptions: {
       headless: "new",
       args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-features=IsolateOrigins,site-per-process",
-        "--disable-blink-features=AutomationControlled",
+        ...chromium.args,
+        "--disable-blink-features=AutomationControlled", // stealth tweak
       ],
-      executablePath: process.env.NODE_ENV === "production" ? process.env.PUPPETEER_EXECUTABLE_PATH : puppeteerExtra.executablePath(),
+
+      executablePath:
+        process.env.NODE_ENV === "production"
+          ? await chromium.executablePath()
+          : puppeteerExtra.executablePath(),
     },
     timeout: GOTO_TIMEOUT + 10000,
   });
