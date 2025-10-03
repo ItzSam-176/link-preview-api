@@ -469,38 +469,32 @@ async function scrapeWithPuppeteer(url) {
   if (!browser) throw new Error("Puppeteer browser not initialized");
 
   const page = await browser.newPage();
+
+  // Intercept requests to skip images/media/fonts
+  await page.setRequestInterception(true);
+  page.on("request", (req) => {
+    const blocked = ["image", "media", "font", "stylesheet"];
+    if (blocked.includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+
   try {
-    // --- Stealth + User-Agent + Headers ---
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36"
     );
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setExtraHTTPHeaders({ "accept-language": "en-US,en;q=0.9" });
 
+    // Stealth: hide automation
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     });
 
-    // --- Skip heavy resources ---
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const resourceType = req.resourceType();
-      if (["image", "media", "font"].includes(resourceType)) {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
+    // Navigate
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-    // --- Reduce navigation wait: use domcontentloaded instead of networkidle0 ---
-    await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: GOTO_TIMEOUT,
-    });
-
-    // --- Give JS some time for dynamic OG/meta tags ---
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
+    // Short delay for JS to populate OG tags
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     const html = await page.content();
     const $ = cheerio.load(html);
@@ -521,6 +515,7 @@ async function scrapeWithPuppeteer(url) {
     await page.close();
   }
 }
+
 
 /* --- Detect JS-heavy sites --- */
 function isJsHeavySite(url) {
