@@ -97,7 +97,32 @@ async function initCluster() {
     throw err;
   }
 
-  // Launch cluster
+  // Test opening a browser manually
+  try {
+    console.log("🔹 Testing browser launch manually...");
+    const testBrowser = await puppeteerExtra.launch({
+      headless: chromium.headless,
+      args: [
+        ...chromium.args,
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+      executablePath,
+      dumpio: true,
+    });
+
+    const page = await testBrowser.newPage();
+    console.log("✅ Successfully opened a test page");
+    await page.close();
+    await testBrowser.close();
+  } catch (err) {
+    console.error("❌ Failed to open a test page:", err);
+    throw err; // Stop here if browser can't launch
+  }
+
+  // Launch Puppeteer Cluster
   try {
     console.log("🔹 Launching Puppeteer Cluster...");
     cluster = await Cluster.launch({
@@ -116,17 +141,11 @@ async function initCluster() {
           "--disable-dev-shm-usage",
         ],
         executablePath,
-        timeout: GOTO_TIMEOUT,
         dumpio: true,
+        timeout: GOTO_TIMEOUT,
       },
     });
-    try {
-      const page = await browser.newPage();
-      console.log("✅ Successfully opened a test page");
-      await page.close();
-    } catch (err) {
-      console.error("❌ Failed to open a test page:", err);
-    }
+
     console.log("✅ Puppeteer Cluster launched successfully!");
   } catch (err) {
     console.error("❌ Failed to launch Puppeteer Cluster:", err);
