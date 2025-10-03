@@ -101,7 +101,9 @@ async function initCluster() {
   try {
     console.log("🔹 Launching Puppeteer Cluster...");
     cluster = await Cluster.launch({
-      concurrency: Cluster.CONCURRENCY_CONTEXT,
+      concurrency: isProduction
+        ? Cluster.CONCURRENCY_PAGE
+        : Cluster.CONCURRENCY_CONTEXT,
       maxConcurrency: MAX_CONCURRENCY,
       puppeteer: puppeteerExtra,
       puppeteerOptions: {
@@ -111,11 +113,20 @@ async function initCluster() {
           "--disable-blink-features=AutomationControlled",
           "--no-sandbox",
           "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
         ],
         executablePath,
         timeout: GOTO_TIMEOUT,
+        dumpio: true,
       },
     });
+    try {
+      const page = await browser.newPage();
+      console.log("✅ Successfully opened a test page");
+      await page.close();
+    } catch (err) {
+      console.error("❌ Failed to open a test page:", err);
+    }
     console.log("✅ Puppeteer Cluster launched successfully!");
   } catch (err) {
     console.error("❌ Failed to launch Puppeteer Cluster:", err);
