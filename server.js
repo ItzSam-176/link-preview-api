@@ -391,7 +391,9 @@ async function initBrowser() {
     : require("puppeteer").executablePath();
 
   browser = await puppeteerExtra.launch({
-    headless: chromium.headless,
+    headless: isProduction ? true : chromium.headless,
+    ignoreDefaultArgs: ["--disable-extensions"],
+    ignoreHttpsErrors: true,
     args: [
       ...chromium.args,
       "--disable-blink-features=AutomationControlled",
